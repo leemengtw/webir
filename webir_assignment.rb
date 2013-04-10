@@ -36,3 +36,50 @@ inverted_index = File.foreach("test.txt") do |line| #對檔案inverted-index逐�
 end
 
 termHash.each {|key, value| puts "term #{value.id}: #{value.df}  #{value.docList}"}
+
+
+
+
+
+#將指定的query XML檔切成一個一個單獨的query存起來再讀入
+#ruby XML parser
+#system...
+
+
+#讀進voacb，將裡頭的字讀進來並存起來
+vocab = {} #存在字典的term，key是term，value是term的id(預設id=0)
+count = 0 
+vocab_term = File.foreach("vocab.all") do |line|
+	vocab[line] = count
+	count = count + 1
+end
+
+
+#得到query斷的字以後算出query的vector, tf*idf，再跟文件算分數：
+query_term = {} #存放query的term, key是term，value是normalized TF*IDF
+
+#算出每個term的tf
+
+#將tf跟idf相乘
+tfidf_sum = nil
+query_term.each do |term, tfidf|
+	tfidf = tfidf * Math.log(termHash[vocab[term]].df)
+	tfidf_sum += tfidf
+end
+
+#再normalize
+query_term.each do |term, tfidf|
+	tfidf = tfidf / tfidf_sum
+end
+
+
+cosine_list = Hash.new(""=>0) #key是文章id，value是query跟文章的Cosine Similarity
+
+query_term.each do |term, value|	#針對每個query term去算分數
+	termHash[vocab[term]].docList.each do |doc_id, tfidf|
+		cosine_list[doc_id] += value * tfidf
+	end
+end
+
+cosine_list.sort
+#選前幾篇
