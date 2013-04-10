@@ -1,8 +1,8 @@
-#讀入inverted-index, vocau檔案，建立每篇文章的維度(term vector)
+=begin
+讀入inverted-index, vocau檔案，建立每篇文章的維度(term vector)
+or: 以term為中心，建立posting-list，並建成unit vector
+=end
 require 'fileUtils'
-
-#class DocVector
-
 class Term
 	attr_accessor :id, :name, :df, :docList
 	def initialize(id=0, df=0)
@@ -16,26 +16,53 @@ class Term
 	end
 end
 
+time1 = Time.now
 
-
-termHash = {} #存放每個Term物件的陣列
-
+termHash = {} #存放每個Term物件的雜湊，key是term id，key是Term物件
+tfidf_list = Hash.new(0.0) #記錄每篇文章加總的TFIDF，用來做normalization，索引是文件id
 current_term = nil
-
-inverted_index = File.foreach("test.txt") do |line| #對檔案inverted-index逐行操作
+num_doc = 97445
+=begin
+算出每個term裡頭的docList所記錄的文章對應的TF*IDF：先利用df算出idf乘上
+文章本來的TF並逐漸把紀錄加總(TFIDF_sum)，最後再利用此值作normalization
+共有97445篇文章(num_doc)
+=end
+inverted_index = File.foreach("inverted-index") do |line| #對檔案inverted-index逐行操作
 	line_s = line.split(" ")
 
 	if line_s.size.eql?(3) && line_s[1].eql?("-1") #將新unigram加到termHash裡頭並記錄該term的資訊 
 		term = Term.new(line_s[0].to_i, line_s[2].to_i)
 		termHash[term.id] = term  
-		puts "term #{term.name}\'s id: #{term.id} df : #{term.df}"
+		#puts "term #{term.name}\'s id: #{term.id} df : #{term.df}"
 		current_term = term.id
-	elsif line_s.size.eql?(2) #記錄某term在某文件的tf
-		termHash[current_term].docList[line_s[0].to_i] = line_s[1].to_i		
+	elsif line_s.size.eql?(2) #記錄某term有出現某文件以及其tf並算出尚未normalize的TFIDF
+		value = line_s[1].to_i * Math.log(num_doc/(termHash[current_term].df)) #unnormalized tf*idf
+		termHash[current_term].docList[line_s[0].to_i] = value	
+		tfidf_list[line_s[0]] += value 
+	end
+end #把所有term的相關資料存入記憶體，建完termHash
+
+time2 = Time.now
+
+#termHash.each {|key, value| puts "term #{value.id}: #{value.df}  #{value.docList}"}
+#tfidf_list.each {|key, value| puts "key #{key}: #{value}"}
+
+#normalized TF*IDF
+termHash.each do |term_id, term|  #針對所有term
+	term.docList.each do |doc_id, idf|
+		idf = idf / tfidf_list[doc_id]
 	end
 end
 
-termHash.each {|key, value| puts "term #{value.id}: #{value.df}  #{value.docList}"}
+#輸出結果
+
+i = 1
+while i < 10 do 
+	puts "Term #{termHash[i].id}\'s df: #{termHash[i].df}, docList: #{termHash[i].docList}"
+	i = i + 1
+end
+
+puts "It takes #{time2 - time1} to run"
 
 
 
