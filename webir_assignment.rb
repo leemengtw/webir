@@ -1,8 +1,9 @@
-=begin
-讀入inverted-index, vocau檔案，建立每篇文章的維度(term vector)
-or: 以term為中心，建立posting-list，並建成unit vector
-=end
+
+#讀入inverted-index, vocau檔案，建立每篇文章的維度(term vector)
+#or: 以term為中心，建立posting-list，並建成unit vector
+
 require 'fileUtils'
+require 'rexml/document'
 class Term
 	attr_accessor :id, :name, :df, :docList
 	def initialize(id=0, df=0)
@@ -17,16 +18,16 @@ class Term
 end
 
 time1 = Time.now
-
+=begin
 termHash = {} #存放每個Term物件的雜湊，key是term id，key是Term物件
 tfidf_list = Hash.new(0.0) #記錄每篇文章加總的TFIDF，用來做normalization，索引是文件id
 current_term = nil
 num_doc = 97445
-=begin
-算出每個term裡頭的docList所記錄的文章對應的TF*IDF：先利用df算出idf乘上
-文章本來的TF並逐漸把紀錄加總(TFIDF_sum)，最後再利用此值作normalization
-共有97445篇文章(num_doc)
-=end
+
+#算出每個term裡頭的docList所記錄的文章對應的TF*IDF：先利用df算出idf乘上
+#文章本來的TF並逐漸把紀錄加總(TFIDF_sum)，最後再利用此值作normalization
+#共有97445篇文章(num_doc)
+
 inverted_index = File.foreach("inverted-index") do |line| #對檔案inverted-index逐行操作
 	line_s = line.split(" ")
 
@@ -50,7 +51,7 @@ time2 = Time.now
 #normalized TF*IDF
 termHash.each do |term_id, term|  #針對所有term
 	term.docList.each do |doc_id, idf|
-		idf = idf / tfidf_list[doc_id]
+		termHash[term_id].docList[doc_id] = idf / tfidf_list[doc_id]
 	end
 end
 
@@ -63,7 +64,7 @@ while i < 10 do
 end
 
 puts "It takes #{time2 - time1} to run"
-
+=end
 
 
 
@@ -77,30 +78,50 @@ puts "It takes #{time2 - time1} to run"
 vocab = {} #存在字典的term，key是term，value是term的id(預設id=0)
 count = 0 
 vocab_term = File.foreach("vocab.all") do |line|
+	line.chomp! 
 	vocab[line] = count
 	count = count + 1
 end
 
 
+
 #得到query斷的字以後算出query的vector, tf*idf，再跟文件算分數：
-query_term = {} #存放query的term, key是term，value是normalized TF*IDF
+query_term = { "Valentine"=> 1, "Powell"=>1, "Copper"=>1} #存放query的term, key是term，value是normalized TF*IDF
+
+termHash ={}
+
+termHash[1] = Term.new(1, 2)  
+termHash[2] = Term.new(2, 1)  
+termHash[3] = Term.new(3, 2)  
+
+termHash[1].docList[0] = 1
+termHash[1].docList[1] = 1
+termHash[2].docList[0] = 1
+termHash[3].docList[0] = 1
+termHash[3].docList[2] = 1
 
 #算出每個term的tf
 
 #將tf跟idf相乘
-tfidf_sum = nil
+tfidf_sum = 0.0
 query_term.each do |term, tfidf|
-	tfidf = tfidf * Math.log(termHash[vocab[term]].df)
-	tfidf_sum += tfidf
+	query_term[term] = tfidf * Math.log(97445/termHash[vocab[term]].df)
+	tfidf_sum += query_term[term]
 end
+
+puts "tfidf_sum: #{tfidf_sum}"
+query_term.each {|k, v| puts "term= #{k}, tfidf= #{v}"}
 
 #再normalize
 query_term.each do |term, tfidf|
-	tfidf = tfidf / tfidf_sum
+	query_term[term] = tfidf / tfidf_sum
+	puts tfidf
 end
 
+query_term.each {|k, v| puts "term= #{k}, tfidf= #{v}"}
 
-cosine_list = Hash.new(""=>0) #key是文章id，value是query跟文章的Cosine Similarity
+
+cosine_list = Hash.new {|hash, key| hash[key] = 0.0} #key是文章id，value是query跟文章的Cosine Similarity
 
 query_term.each do |term, value|	#針對每個query term去算分數
 	termHash[vocab[term]].docList.each do |doc_id, tfidf|
@@ -108,5 +129,9 @@ query_term.each do |term, value|	#針對每個query term去算分數
 	end
 end
 
-cosine_list.sort
-#選前幾篇
+cosine_list.each {|k, v| puts "doc id: #{k}, cosine: #{v}"}
+
+
+#選Cosine值大於0.65的文件當作relevent
+relevent = cosine_list.select {|k, v| v > 0.65}
+relevent.each {|k, v| puts "relevent doc id: #{k}, cosine: #{v}"}
