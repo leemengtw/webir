@@ -110,6 +110,7 @@ end
 
 
 #計算每個字出現的次數並刪除重複，紀錄在queryList和num
+nthquery = 1
 queryList.each do |q| #針對每篇query
 	count = 0 # term counter
 	num = Array.new()
@@ -133,10 +134,11 @@ queryList.each do |q| #針對每篇query
 
 =begin
 利用count_cosine.rb把跟query相關的文件找出
-輸入：vocab(字典), query_term(query vector)
+輸入：vocab(字典), query_term(query vector), termHash, 文件名稱的列表file
 輸出：cosineList
 =end
-	count_cosine(vocab, query_term, termHash, file)
+	count_cosine(nthquery.to_s, vocab, query_term, termHash, file)
+	nthquery = nthquery + 1
 end
 
 
