@@ -1,9 +1,10 @@
-
 #讀入inverted-index, vocau檔案，建立每篇文章的維度(term vector)
 #or: 以term為中心，建立posting-list，並建成unit vector
 
 require 'fileUtils'
 require 'rexml/document'
+require_relative 'count_cosine'
+
 class Term
 	attr_accessor :id, :name, :df, :docList
 	def initialize(id=0, df=0)
@@ -18,7 +19,7 @@ class Term
 end
 
 time1 = Time.now
-=begin
+
 termHash = {} #存放每個Term物件的雜湊，key是term id，key是Term物件
 tfidf_list = Hash.new(0.0) #記錄每篇文章加總的TFIDF，用來做normalization，索引是文件id
 current_term = nil
@@ -28,7 +29,7 @@ num_doc = 97445
 #文章本來的TF並逐漸把紀錄加總(TFIDF_sum)，最後再利用此值作normalization
 #共有97445篇文章(num_doc)
 
-inverted_index = File.foreach("inverted-index") do |line| #對檔案inverted-index逐行操作
+inverted_index = File.foreach("test.txt") do |line| #對檔案inverted-index逐行操作
 	line_s = line.split(" ")
 
 	if line_s.size.eql?(3) && line_s[1].eql?("-1") #將新unigram加到termHash裡頭並記錄該term的資訊 
@@ -43,7 +44,7 @@ inverted_index = File.foreach("inverted-index") do |line| #對檔案inverted-ind
 	end
 end #把所有term的相關資料存入記憶體，建完termHash
 
-time2 = Time.now
+
 
 #termHash.each {|key, value| puts "term #{value.id}: #{value.df}  #{value.docList}"}
 #tfidf_list.each {|key, value| puts "key #{key}: #{value}"}
@@ -57,24 +58,17 @@ end
 
 #輸出結果
 
-i = 1
-while i < 10 do 
-	puts "Term #{termHash[i].id}\'s df: #{termHash[i].df}, docList: #{termHash[i].docList}"
-	i = i + 1
-end
-
-puts "It takes #{time2 - time1} to run"
-=end
+#i = 1
+#while i < 10 do 
+#	puts "Term #{termHash[i].id}\'s df: #{termHash[i].df}, docList: #{termHash[i].docList}"
+#	i = i + 1
+#end
 
 
 
 
-#將指定的query XML檔切成一個一個單獨的query存起來再讀入
-#ruby XML parser
-#system...
 
-
-#讀進voacb，將裡頭的字讀進來並存起來
+#讀進voacb，將裡頭的字讀進並存起來
 vocab = {} #存在字典的term，key是term，value是term的id(預設id=0)
 count = 0 
 vocab_term = File.foreach("vocab.all") do |line|
@@ -84,54 +78,65 @@ vocab_term = File.foreach("vocab.all") do |line|
 end
 
 
+#將指定的query XML讀入並分別處理裡面的query
 
-#得到query斷的字以後算出query的vector, tf*idf，再跟文件算分數：
-query_term = { "Valentine"=> 1, "Powell"=>1, "Copper"=>1} #存放query的term, key是term，value是normalized TF*IDF
+xml_data = File.read('query-5.xml')	# get the XML data as a string
+doc = REXML::Document.new(xml_data)
+conceptsList = doc.elements.to_a("xml/topic/concepts") #以concepts標籤當作query內容
 
-termHash ={}
 
-termHash[1] = Term.new(1, 2)  
-termHash[2] = Term.new(2, 1)  
-termHash[3] = Term.new(3, 2)  
-
-termHash[1].docList[0] = 1
-termHash[1].docList[1] = 1
-termHash[2].docList[0] = 1
-termHash[3].docList[0] = 1
-termHash[3].docList[2] = 1
-
-#算出每個term的tf
-
-#將tf跟idf相乘
-tfidf_sum = 0.0
-query_term.each do |term, tfidf|
-	query_term[term] = tfidf * Math.log(97445/termHash[vocab[term]].df)
-	tfidf_sum += query_term[term]
+queryList = [] #存放每個query內容的字串陣列，稍後會變成query vector的陣列
+count = 0
+conceptsList.each do |e| 
+	queryList[count] = e.text.gsub('、', "").to_s.chomp!.lstrip!.delete "。"
+	count = count + 1
 end
 
-puts "tfidf_sum: #{tfidf_sum}"
-query_term.each {|k, v| puts "term= #{k}, tfidf= #{v}"}
+#queryList.each {|e| puts e}
 
-#再normalize
-query_term.each do |term, tfidf|
-	query_term[term] = tfidf / tfidf_sum
-	puts tfidf
+#把queryList裡頭的多個query，個別擁有的內容一個字一個字拆開存
+i = 0
+queryList.each do |e| 
+	queryList[i] = e.split(//)
+	i = i + 1
 end
 
-query_term.each {|k, v| puts "term= #{k}, tfidf= #{v}"}
+
+#計算每個字出現的次數並刪除重複，紀錄在queryList和num
 
 
-cosine_list = Hash.new {|hash, key| hash[key] = 0.0} #key是文章id，value是query跟文章的Cosine Similarity
 
-query_term.each do |term, value|	#針對每個query term去算分數
-	termHash[vocab[term]].docList.each do |doc_id, tfidf|
-		cosine_list[doc_id] += value * tfidf
+queryList.each do |q| #針對每篇query
+	count = 0 # term counter
+	num = Array.new()
+
+	q.each do |term| #針對每個unigram
+		num << q.count(term)
+		temp = q.delete(term)
+		q.insert(count, term)
+		count = count + 1
 	end
+
+	#建立query_term，此為一Hash，key為query的unigram，value為其tf
+	count = 0 # term counter
+	query_term = Hash.new {|hash, key| hash[key] = 0}
+	q.each do |term|
+		query_term[term] = num[count]
+		count = count + 1
+	end
+	
+	#puts query_term
+
+=begin
+利用count_cosine.rb把跟query相關的文件找出
+輸入：vocab(字典), query_term(query vector)
+輸出：cosineList
+=end
+	count_cosine(vocab, query_term, termHash)
+
 end
 
-cosine_list.each {|k, v| puts "doc id: #{k}, cosine: #{v}"}
 
+time2 = Time.now
 
-#選Cosine值大於0.65的文件當作relevent
-relevent = cosine_list.select {|k, v| v > 0.65}
-relevent.each {|k, v| puts "relevent doc id: #{k}, cosine: #{v}"}
+puts "It takes #{time2 - time1} to run"
