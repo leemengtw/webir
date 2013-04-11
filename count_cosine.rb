@@ -1,5 +1,5 @@
 require 'fileUtils'
-def count_cosine(vocab, query_term, termHash, file)
+def count_cosine(nthquery, vocab, query_term, termHash, file)
 
 	#得到query斷的字以後算出query的vector, tf*idf，再跟文件算分數：
 
@@ -37,11 +37,13 @@ def count_cosine(vocab, query_term, termHash, file)
 	relevent.each do |e|
 		e[0] = file[e[0]]
 	end
-	#puts relevent
-
-	#輸出結果：
-	FileUtils.mkdir 'test'
-
+	#輸出結果到output.txt：
+	output = File.open("output.txt", "a")
+	relevent.each do |e|
+		result = "00" + nthquery + "\t" + e[0] + "\n"
+		output.write(result)
+	end
+	output.close()
 end
 
 
@@ -91,6 +93,6 @@ end
 		count = count + 1
 	end
 
-	count_cosine(vocab, query_term, termHash, file)
+	count_cosine("1", vocab, query_term, termHash, file)
 
 end
