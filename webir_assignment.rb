@@ -68,7 +68,7 @@ end
 
 
 
-#讀進voacb，將裡頭的字讀進並存起來
+#讀進字典voacb，將裡頭的字讀進並存起來
 vocab = {} #存在字典的term，key是term，value是term的id(預設id=0)
 count = 0 
 vocab_term = File.foreach("vocab.all") do |line|
@@ -77,6 +77,13 @@ vocab_term = File.foreach("vocab.all") do |line|
 	count = count + 1
 end
 
+#讀進filelist，之後要輸出"相關文件"時要對照id跟文章名稱
+file = {} # key為id，value為文件名
+count = 0
+File.foreach('file-list') do |line|
+	file[count] = line.chomp![-15, 15]
+	count = count + 1
+end
 
 #將指定的query XML讀入並分別處理裡面的query
 
@@ -92,7 +99,7 @@ conceptsList.each do |e|
 	count = count + 1
 end
 
-#queryList.each {|e| puts e}
+
 
 #把queryList裡頭的多個query，個別擁有的內容一個字一個字拆開存
 i = 0
@@ -103,9 +110,6 @@ end
 
 
 #計算每個字出現的次數並刪除重複，紀錄在queryList和num
-
-
-
 queryList.each do |q| #針對每篇query
 	count = 0 # term counter
 	num = Array.new()
@@ -132,11 +136,9 @@ queryList.each do |q| #針對每篇query
 輸入：vocab(字典), query_term(query vector)
 輸出：cosineList
 =end
-	count_cosine(vocab, query_term, termHash)
-
+	count_cosine(vocab, query_term, termHash, file)
 end
 
 
 time2 = Time.now
-
 puts "It takes #{time2 - time1} to run"
